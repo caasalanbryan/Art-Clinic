@@ -1,0 +1,12 @@
+# Local database credentials
+config.php
+.env
+.env.*
+
+# Dependencies
+node_modules/
+
+# Local files
+*.log
+.DS_Store
+Thumbs.db
