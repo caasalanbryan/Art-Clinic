@@ -63,6 +63,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <title>Login | ART CARE</title>
 
+
+    <link rel="icon" type="image/png" href="artcare-logo.png">
     <link rel="stylesheet" href="style.css">
 
     <style>
@@ -118,13 +120,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <!-- LEFT SIDE: BRANDING -->
     <div class="hero">
 
-        <div class="brand">
-            ✦ ART CARE
+        <div class="brand login-brand">
+    <img
+        src="artcare-logo.png"
+        alt="ART Dental Center Logo"
+        class="login-logo"
+    >
 
-            <small>
-                DENTAL CARE CLINIC MANAGEMENT SYSTEM
-            </small>
-        </div>
+    <div>
+        <strong>ART CARE</strong>
+        <small>DENTAL CARE CLINIC MANAGEMENT SYSTEM</small>
+    </div>
+</div>
 
         <small>WELCOME BACK</small>
 

@@ -5,7 +5,22 @@ require_login();
 
 
 $page = $_GET['page'] ?? 'dashboard';
+// COUNT UNREAD NOTIFICATIONS
+$userId = (int)($_SESSION['user']['id'] ?? 0);
 
+$unreadNotifications = 0;
+
+if ($userId > 0) {
+    $result = one(
+        "SELECT COUNT(*) AS total
+         FROM notifications
+         WHERE user_id = ? AND is_read = 0",
+        "i",
+        [$userId]
+    );
+
+    $unreadNotifications = (int)($result['total'] ?? 0);
+}
 
 
 $labels = [
@@ -13,7 +28,6 @@ $labels = [
     'patients' => 'Patient Management',
     'appointments' => 'Appointment Management',
     'calendar' => 'Calendar & Schedule',
-    'attendance' => 'Attendance Monitoring',
     'history' => 'Appointment History',
     'notifications' => 'Notifications',
     'reports' => 'Reports',
@@ -45,6 +59,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         verify_post();
         $action = $_POST['action'] ?? '';
+
+        // MARK SINGLE NOTIFICATION AS READ
+if ($action === 'read_notification') {
+
+    $id = (int)($_POST['id'] ?? 0);
+    $userId = (int)$_SESSION['user']['id'];
+
+    stmt(
+        "UPDATE notifications
+         SET is_read = 1
+         WHERE id = ? AND user_id = ?",
+        "ii",
+        [$id, $userId]
+    );
+
+    go('?page=notifications');
+}
+
+// MARK ALL NOTIFICATIONS AS READ
+if ($action === 'read_all_notifications') {
+
+    $userId = (int)$_SESSION['user']['id'];
+
+    stmt(
+        "UPDATE notifications
+         SET is_read = 1
+         WHERE user_id = ?",
+        "i",
+        [$userId]
+    );
+
+    go('?page=notifications');
+}
 
         // ADD PATIENT
         if ($action === 'add_patient') {
@@ -281,6 +328,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 );
             }
 
+        create_notification(
+    'New Appointment',
+    'A new dental appointment has been scheduled.',
+    'appointment'
+);    
             notice('Appointment created successfully.');
             go('?page=appointments');
         }
@@ -473,6 +525,7 @@ $completedCount = count(array_filter(
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <link rel="icon" type="image/png" href="artcare-logo.png">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -518,10 +571,18 @@ $completedCount = count(array_filter(
 
 <!-- SIDEBAR -->
 <aside>
-    <div class="brand">
-        ✦ &nbsp; ART CARE
+   <div class="brand sidebar-brand">
+    <img
+        src="artcare-logo.png"
+        alt="ART Dental Center Logo"
+        class="sidebar-logo"
+    >
+
+    <div class="brand-text">
+        <strong>ART CARE</strong>
         <small>DENTAL CLINIC SYSTEM</small>
     </div>
+</div>
 
     <small class="navtitle">WORKSPACE</small>
 
@@ -536,13 +597,16 @@ $completedCount = count(array_filter(
 
             ?>
 
-            <a
-                href="?page=<?= esc($key) ?>"
-                class="<?= $page === $key ? 'active' : '' ?>"
-            >
-                <?= esc($label) ?>
-            </a>
+           <a
+    href="?page=<?= esc($key) ?>"
+    class="<?= $page === $key ? 'active' : '' ?>"
+>
+    <?= esc($label) ?>
 
+    <?php if ($key === 'notifications' && $unreadNotifications > 0): ?>
+        <span class="notification-dot"></span>
+    <?php endif; ?>
+</a>
         <?php endforeach; ?>
     </nav>
 
@@ -1123,7 +1187,6 @@ document.addEventListener('keydown', function (event) {
                         <th>Service</th>
                         <th>Status</th>
                         <th>Update</th>
-                        <th>Arrival</th>
                     </tr>
 
                     <?php foreach ($appointments as $a): ?>
@@ -1262,7 +1325,12 @@ document.addEventListener('keydown', function (event) {
                         String(d).padStart(2, '0')
                     ].join('-');
 
-                    const count = events.filter(e => e.date === day).length;
+                    
+                    const count = events.filter(e =>
+                        e.date === day &&
+                        ['Pending', 'Confirmed', 'Rescheduled'].includes(e.status)
+                    ).length;
+
                     const button = document.createElement('button');
 
                     button.type = 'button';
@@ -1272,10 +1340,11 @@ document.addEventListener('keydown', function (event) {
                     button.textContent = d;
 
                     if (count > 0) {
-                        const small = document.createElement('small');
-                        small.textContent = count + ' appointment(s)';
-                        button.appendChild(small);
+                        const dot = document.createElement('span');
+                        dot.className = 'calendar-appointment-dot';
+                        button.appendChild(dot);
                     }
+
 
                     
 
@@ -1380,75 +1449,6 @@ function closeCalendarAppointment() {
     </div>
 </div>
 
-
-    <!-- ATTENDANCE -->
-    <?php elseif ($page === 'attendance'): ?>
-
-        <h2>Attendance Monitoring</h2>
-        <p>Mark appointments as completed or no-show.</p>
-
-        <div class="card">
-            <form method="get">
-                <input type="hidden" name="page" value="attendance">
-
-                <input
-                    type="date"
-                    name="date"
-                    value="<?= esc($_GET['date'] ?? date('Y-m-d')) ?>"
-                >
-
-                <button type="submit">Filter</button>
-            </form>
-
-            <div class="table-wrap">
-                <table>
-                    <tr>
-                        <th>Patient</th>
-                        <th>Time</th>
-                        <th>Status</th>
-                        <th>Action</th>
-                    </tr>
-
-                    <?php foreach ($appointments as $a): ?>
-                        <?php
-                        if (
-                            $a['appointment_date'] !==
-                            ($_GET['date'] ?? date('Y-m-d'))
-                        ) {
-                            continue;
-                        }
-                        ?>
-
-                        <tr>
-                            <td><?= esc($a['patient_name']) ?></td>
-                            <td><?= esc(substr($a['start_time'], 0, 5)) ?></td>
-                            <td><?= esc($a['status']) ?></td>
-
-                            <td>
-                                <form method="post" class="inline">
-                                    <input type="hidden" name="csrf" value="<?= csrf() ?>">
-                                    <input type="hidden" name="action" value="status">
-                                    <input type="hidden" name="id" value="<?= (int)$a['id'] ?>">
-
-                                    <button name="status" value="Completed">
-                                        Completed
-                                    </button>
-
-                                    <button
-                                        class="muted"
-                                        name="status"
-                                        value="No-Show"
-                                    >
-                                        No-show
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </table>
-            </div>
-        </div>
-
     <!-- APPOINTMENT HISTORY -->
     <?php elseif ($page === 'history'): ?>
 
@@ -1476,7 +1476,129 @@ function closeCalendarAppointment() {
                 </table>
             </div>
         </div>
+    
+    <!-- NOTIFICATIONS -->    
+        <?php elseif ($page === 'notifications'): ?>
 
+<?php
+$userId = (int)$_SESSION['user']['id'];
+
+$notifications = rows(
+    "SELECT *
+     FROM notifications
+     WHERE user_id = ?
+     ORDER BY created_at DESC, id DESC
+     LIMIT 100",
+    "i",
+    [$userId]
+);
+
+$unread = one(
+    "SELECT COUNT(*) AS total
+     FROM notifications
+     WHERE user_id = ? AND is_read = 0",
+    "i",
+    [$userId]
+);
+
+$unreadCount = (int)($unread['total'] ?? 0);
+?>
+
+<div class="section-head">
+    <div>
+        <h2>Notifications</h2>
+        <p>Stay updated with clinic activities.</p>
+    </div>
+</div>
+
+<div class="card">
+
+    <div class="notification-header">
+        <h3>
+            Notifications
+            (<?= $unreadCount ?> unread)
+        </h3>
+
+        <?php if ($unreadCount > 0): ?>
+            <form method="post">
+                <input
+                    type="hidden"
+                    name="csrf"
+                    value="<?= esc(csrf()) ?>"
+                >
+
+                <input
+                    type="hidden"
+                    name="action"
+                    value="read_all_notifications"
+                >
+
+                <button type="submit">
+                    Mark All as Read
+                </button>
+            </form>
+        <?php endif; ?>
+    </div>
+
+    <?php if (empty($notifications)): ?>
+
+        <p>No notifications yet.</p>
+
+    <?php else: ?>
+
+        <?php foreach ($notifications as $n): ?>
+
+            <div class="notification-item <?= $n['is_read'] ? 'read' : 'unread' ?>">
+
+                <div>
+                    <h4>
+                        <?= esc($n['title']) ?>
+                    </h4>
+
+                    <p>
+                        <?= esc($n['message']) ?>
+                    </p>
+
+                    <small>
+                        <?= esc($n['created_at']) ?>
+                    </small>
+                </div>
+
+                <?php if (!$n['is_read']): ?>
+
+                    <form method="post">
+                        <input
+                            type="hidden"
+                            name="csrf"
+                            value="<?= esc(csrf()) ?>"
+                        >
+
+                        <input
+                            type="hidden"
+                            name="action"
+                            value="read_notification"
+                        >
+
+                        <input
+                            type="hidden"
+                            name="id"
+                            value="<?= (int)$n['id'] ?>"
+                        >
+
+                        <button type="submit">
+                            Mark as Read
+                        </button>
+                    </form>
+
+                <?php endif; ?>
+
+            </div>
+
+        <?php endforeach; ?>
+
+    <?php endif; ?>
+
+</div>
     <!-- REPORTS -->
     <?php elseif ($page === 'reports'): ?>
 
