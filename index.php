@@ -3,29 +3,38 @@
 require 'config.php';
 require_login();
 
+
 $page = $_GET['page'] ?? 'dashboard';
+
+
 
 $labels = [
     'dashboard' => 'Dashboard',
-    'patients' => 'Patients',
-    'appointments' => 'Appointments',
+    'patients' => 'Patient Management',
+    'appointments' => 'Appointment Management',
     'calendar' => 'Calendar & Schedule',
-    'attendance' => 'Attendance',
+    'attendance' => 'Attendance Monitoring',
     'history' => 'Appointment History',
+    'notifications' => 'Notifications',
     'reports' => 'Reports',
     'settings' => 'Clinic Settings',
-    'accounts' => 'Accounts'
+    'accounts' => 'Receptionist Account'
 ];
+
+
 
 if (!isset($labels[$page])) {
     $page = 'dashboard';
 }
 
-if ($page === 'accounts' && !admin()) {
+
+if ($page === 'accounts' && !can_create_accounts()) {
     $page = 'dashboard';
 }
 
-$error = '';
+
+$error = $_SESSION['form_error'] ?? '';
+unset($_SESSION['form_error']);
 $statuses = [
     'Pending', 'Confirmed', 'Rescheduled',
     'Completed', 'Cancelled', 'No-Show'
@@ -64,19 +73,111 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             go('?page=patients');
         }
 
+        // EDIT PATIENT
+        if ($action === 'edit_patient') {
+            $id = (int)($_POST['id'] ?? 0);
+            $name = trim($_POST['name'] ?? '');
+            $contact = trim($_POST['contact'] ?? '');
+            $email = trim($_POST['email'] ?? '');
+            $address = trim($_POST['address'] ?? '');
+            $birthDate = trim($_POST['birth_date'] ?? '');
+            $notes = trim($_POST['notes'] ?? '');
+
+            if ($id <= 0 || $name === '') {
+                throw new Exception('Valid patient name is required.');
+            }
+
+            if ($email !== '' &&
+                !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                throw new Exception('Invalid email address.');
+            }
+
+            if ($birthDate !== '') {
+                $birth = DateTimeImmutable::createFromFormat(
+                    '!Y-m-d',
+                    $birthDate
+                );
+
+                if (!$birth ||
+                    $birth->format('Y-m-d') !== $birthDate ||
+                    $birthDate > date('Y-m-d')) {
+                    throw new Exception('Invalid birth date.');
+                }
+            }
+
+            $existing = one(
+                'SELECT id FROM patients WHERE id=?',
+                'i',
+                [$id]
+            );
+
+            if (!$existing) {
+                throw new Exception('Patient not found.');
+            }
+
+            stmt(
+                "UPDATE patients SET
+                    full_name=?,
+                    contact=?,
+                    email=?,
+                    address=?,
+                    birth_date=NULLIF(?, ''),
+                    notes=?
+                 WHERE id=?",
+                'ssssssi',
+                [
+                    $name,
+                    $contact,
+                    $email,
+                    $address,
+                    $birthDate,
+                    $notes,
+                    $id
+                ]
+            );
+
+            notice('Patient information updated successfully.');
+            go('?page=patients');
+        }
+
+
+        
         // DELETE PATIENT
         if ($action === 'delete_patient') {
+
             if (!admin()) {
                 throw new Exception('Administrator only.');
             }
 
-            stmt(
-                'DELETE FROM patients WHERE id=?',
+            $id = (int)($_POST['id'] ?? 0);
+
+            if ($id <= 0) {
+                throw new Exception('Invalid patient ID.');
+            }
+
+            // Check whether the patient has appointments
+            $linked = one(
+                'SELECT COUNT(*) AS total
+                 FROM appointments
+                 WHERE patient_id = ?',
                 'i',
-                [(int)($_POST['id'] ?? 0)]
+                [$id]
             );
 
-            notice('Patient deleted.');
+            if ((int)$linked['total'] > 0) {
+                throw new Exception(
+                    'Cannot delete this patient because they have appointment records. Keep the patient to preserve appointment history.'
+                );
+            }
+
+            // Delete patient without appointments
+            stmt(
+                'DELETE FROM patients WHERE id = ?',
+                'i',
+                [$id]
+            );
+
+            notice('Patient deleted successfully.');
             go('?page=patients');
         }
 
@@ -152,7 +253,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if ($conflict) {
                     throw new Exception(
-                        'Time conflict! Another appointment already exists.'
+                       'DOUBLE BOOKING WARNING! This date and time is already reserved. Please select another available schedule.'
                     );
                 }
 
@@ -184,135 +285,148 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             go('?page=appointments');
         }
 
-        // UPDATE APPOINTMENT STATUS
-        if ($action === 'status') {
+
+        // CONFIRM PATIENT ARRIVAL
+        if ($action === 'mark_arrived') {
+
             $id = (int)($_POST['id'] ?? 0);
-            $status = $_POST['status'] ?? '';
 
-            if (!in_array($status, $statuses, true)) {
-                throw new Exception('Invalid appointment status.');
-            }
-
-            $old = one(
-                'SELECT status FROM appointments WHERE id=?',
+            $appointment = one(
+                "SELECT id, status, arrived_at
+                 FROM appointments
+                 WHERE id = ?",
                 'i',
                 [$id]
             );
 
-            if (!$old) {
+            if (!$appointment) {
                 throw new Exception('Appointment not found.');
             }
 
-            if ($old['status'] !== $status) {
-                stmt(
-                    'UPDATE appointments SET status=? WHERE id=?',
-                    'si',
-                    [$status, $id]
-                );
+            if (!in_array(
+                $appointment['status'],
+                ['Pending', 'Confirmed', 'Rescheduled'],
+                true
+            )) {
+                throw new Exception('Appointment is no longer active.');
+            }
 
-                stmt(
-                    "INSERT INTO appointment_history
-                    (appointment_id, old_status, new_status, changed_by)
-                    VALUES (?, ?, ?, ?)",
-                    'issi',
-                    [
-                        $id,
-                        $old['status'],
-                        $status,
-                        $_SESSION['user']['id']
-                    ]
+            if ($appointment['arrived_at'] !== null) {
+                throw new Exception('Patient already marked as arrived.');
+            }
+
+            $arrivalTime = (new DateTimeImmutable(
+                'now',
+                new DateTimeZone('Asia/Manila')
+            ))->format('Y-m-d H:i:s');
+
+            $updated = stmt(
+                "UPDATE appointments
+                 SET arrived_at = ?
+                 WHERE id = ?
+                   AND arrived_at IS NULL
+                   AND status IN
+                   ('Pending', 'Confirmed', 'Rescheduled')",
+                'si',
+                [$arrivalTime, $id]
+            );
+
+            if ($updated->affected_rows !== 1) {
+                throw new Exception(
+                    'Appointment already updated. Please refresh.'
                 );
             }
 
-            notice('Appointment updated.');
+            notice('Patient arrival confirmed successfully.');
             go('?page=appointments');
         }
 
-        // CLINIC SETTINGS
-        if ($action === 'settings') {
-            if (!admin()) {
-                throw new Exception('Administrator only.');
-            }
+        // UPDATE APPOINTMENT STATUS
+if ($action === 'status') {
 
-            $open = $_POST['opening'] ?? '';
-            $close = $_POST['closing'] ?? '';
-            $duration = (int)($_POST['duration'] ?? 0);
+    $id = (int)($_POST['id'] ?? 0);
+    $status = $_POST['status'] ?? '';
 
-            if (
-                !preg_match('/^\d{2}:\d{2}$/', $open) ||
-                !preg_match('/^\d{2}:\d{2}$/', $close) ||
-                $close <= $open ||
-                $duration < 5 ||
-                $duration > 480
-            ) {
-                throw new Exception('Invalid clinic settings.');
-            }
-
-            stmt(
-                "UPDATE clinic_settings SET
-                clinic_name=?, contact=?, address=?,
-                opening_time=?, closing_time=?, duration_minutes=?
-                WHERE id=1",
-                'sssssi',
-                [
-                    trim($_POST['clinic_name'] ?? ''),
-                    trim($_POST['contact'] ?? ''),
-                    trim($_POST['address'] ?? ''),
-                    $open,
-                    $close,
-                    $duration
-                ]
-            );
-
-            notice('Clinic settings saved.');
-            go('?page=settings');
-        }
-
-        // CREATE ADMIN OR STAFF ACCOUNT
-        if ($action === 'account') {
-            if (!admin()) {
-                throw new Exception('Administrator only.');
-            }
-
-            $name = trim($_POST['name'] ?? '');
-            $username = trim($_POST['username'] ?? '');
-            $password = $_POST['password'] ?? '';
-            $role = $_POST['role'] ?? '';
-
-            if (
-                $name === '' ||
-                $username === '' ||
-                strlen($password) < 8 ||
-                !in_array($role, ['admin', 'staff'], true)
-            ) {
-                throw new Exception(
-                    'Invalid account details. Password needs 8+ characters.'
-                );
-            }
-
-            stmt(
-                "INSERT INTO users
-                (full_name, username, password_hash, role)
-                VALUES (?, ?, ?, ?)",
-                'ssss',
-                [
-                    $name,
-                    $username,
-                    password_hash($password, PASSWORD_DEFAULT),
-                    $role
-                ]
-            );
-
-            notice('Account created successfully.');
-            go('?page=accounts');
-        }
-
-    } catch (Throwable $e) {
-        $error = $e instanceof mysqli_sql_exception
-            ? 'Database operation failed. Check for duplicate or linked records.'
-            : $e->getMessage();
+    if (!in_array($status, $statuses, true)) {
+        throw new Exception('Invalid appointment status.');
     }
+
+    $old = one(
+        "SELECT id, status, arrived_at
+         FROM appointments
+         WHERE id = ?",
+        'i',
+        [$id]
+    );
+
+    if (!$old) {
+        throw new Exception('Appointment not found.');
+    }
+
+    $oldStatus = $old['status'];
+
+    if ($oldStatus === $status) {
+        notice('Appointment status is already ' . $status . '.');
+        go('?page=appointments');
+    }
+
+    if (
+        in_array($oldStatus, ['Completed', 'Cancelled', 'No-Show'], true)
+    ) {
+        throw new Exception('This appointment is already closed.');
+    }
+
+    if ($status === 'Completed' && empty($old['arrived_at'])) {
+        throw new Exception('Confirm patient arrival before completing the appointment.');
+    }
+
+    stmt(
+        "UPDATE appointments
+         SET status = ?
+         WHERE id = ?",
+        'si',
+        [$status, $id]
+    );
+
+    stmt(
+        "INSERT INTO appointment_history
+         (appointment_id, old_status, new_status, changed_by)
+         VALUES (?, ?, ?, ?)",
+        'issi',
+        [
+            $id,
+            $oldStatus,
+            $status,
+            (int)$_SESSION['user']['id']
+        ]
+    );
+
+    notice('Appointment updated successfully.');
+    go('?page=appointments');
 }
+
+   } catch (Throwable $e) {
+
+    $message = $e instanceof mysqli_sql_exception
+        ? 'Database operation failed. Check for duplicate or linked records.'
+        : $e->getMessage();
+
+    $_SESSION['form_error'] = $message;
+
+    $target = $_POST['action'] ?? '';
+
+    if ($target === 'add_appointment' || $target === 'status' || $target === 'mark_arrived') {
+        go('?page=appointments');
+    }
+
+    if (in_array($target, ['add_patient', 'edit_patient', 'delete_patient'], true)) {
+        go('?page=patients');
+    }
+
+    go('?page=dashboard');
+}
+}
+
 
 // LOAD DATABASE RECORDS
 $settings = one('SELECT * FROM clinic_settings WHERE id=1');
@@ -415,9 +529,11 @@ $completedCount = count(array_filter(
         <?php foreach ($labels as $key => $label): ?>
 
             <?php
-            if ($key === 'accounts' && !admin()) {
-                continue;
-            }
+            
+    if ($key === 'accounts' && !can_create_accounts()) {
+    continue;
+}
+
             ?>
 
             <a
@@ -460,17 +576,30 @@ $completedCount = count(array_filter(
     </header>
 
     <?php if (isset($_SESSION['notice'])): ?>
-        <div class="success">
-            <?= esc($_SESSION['notice']) ?>
-        </div>
-        <?php unset($_SESSION['notice']); ?>
+    <div class="success">
+        <?= esc($_SESSION['notice']) ?>
+    </div>
+    <?php unset($_SESSION['notice']); ?>
+<?php endif; ?>
+
+<?php if ($error): ?>
+    <div class="error">
+        <?= esc($error) ?>
+    </div>
+
+    <?php if (strpos($error, 'DOUBLE BOOKING WARNING') !== false): ?>
+        <script>
+            alert(<?= json_encode(
+                $error,
+                JSON_HEX_TAG |
+                JSON_HEX_AMP |
+                JSON_HEX_APOS |
+                JSON_HEX_QUOT
+            ) ?>);
+        </script>
     <?php endif; ?>
 
-    <?php if ($error): ?>
-        <div class="error">
-            <?= esc($error) ?>
-        </div>
-    <?php endif; ?>
+<?php endif; ?>
 
     <!-- DASHBOARD -->
     <?php if ($page === 'dashboard'): ?>
@@ -562,8 +691,11 @@ $completedCount = count(array_filter(
                 </label>
 
                 <label>
-                    Email
-                    <input type="email" name="email">
+                    Email Address (Optional)
+                    <input 
+                    type="email" 
+                    name="email"
+                    placeholder="Leave Blank if not applicable">
                 </label>
 
                 <label>
@@ -585,47 +717,304 @@ $completedCount = count(array_filter(
             </form>
         </div>
 
-        <div class="card">
-            <h3>Patients (<?= count($patients) ?>)</h3>
+        
+<div class="card">
+    <h3>Patients (<?= count($patients) ?>)</h3>
 
-            <div class="table-wrap">
-                <table>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Full Name</th>
+                    <th>Age</th>
+                    <th>Birthday</th>
+                    <th>Contact</th>
+                    <th>Email</th>
+                    <th>Address</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <?php foreach ($patients as $p): ?>
+                    <?php
+                    $age = '—';
+
+                    if (!empty($p['birth_date'])) {
+                        $birthday = new DateTimeImmutable(
+                            $p['birth_date']
+                        );
+                        $todayDate = new DateTimeImmutable('today');
+
+                        if ($birthday <= $todayDate) {
+                            $age = $birthday->diff($todayDate)->y;
+                        }
+                    }
+                    ?>
+
                     <tr>
-                        <th>ID</th>
-                        <th>Name</th>
-                        <th>Contact</th>
-                        <th>Email</th>
-                        <?php if (admin()): ?>
-                            <th>Action</th>
-                        <?php endif; ?>
-                    </tr>
+                        <td><?= (int)$p['id'] ?></td>
+                        <td><?= esc($p['full_name']) ?></td>
+                        <td><?= esc($age) ?></td>
+                        <td>
+                            <?= esc($p['birth_date'] ?: '—') ?>
+                        </td>
+                        <td><?= esc($p['contact'] ?: '—') ?></td>
+                        <td><?= esc($p['email'] ?: '—') ?></td>
+                        <td><?= esc($p['address'] ?: '—') ?></td>
 
-                    <?php foreach ($patients as $p): ?>
-                        <tr>
-                            <td><?= (int)$p['id'] ?></td>
-                            <td><?= esc($p['full_name']) ?></td>
-                            <td><?= esc($p['contact']) ?></td>
-                            <td><?= esc($p['email']) ?></td>
+                        <td>
+                            <div class="patient-actions">
 
-                            <?php if (admin()): ?>
-                                <td>
+                                <button
+                                    type="button"
+                                    onclick="openPatientModal(<?= (int)$p['id'] ?>, 'edit')"
+                                >
+                                    Edit
+                                </button>
+
+                                <?php if (admin()): ?>
                                     <form
                                         method="post"
-                                        onsubmit="return confirm('Delete this patient?');"
+                                        onsubmit="return confirm('Are you sure you want to delete this patient?');"
                                     >
-                                        <input type="hidden" name="csrf" value="<?= csrf() ?>">
-                                        <input type="hidden" name="action" value="delete_patient">
-                                        <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
+                                        <input
+                                            type="hidden"
+                                            name="csrf"
+                                            value="<?= esc(csrf()) ?>"
+                                        >
+                                        <input
+                                            type="hidden"
+                                            name="action"
+                                            value="delete_patient"
+                                        >
+                                        <input
+                                            type="hidden"
+                                            name="id"
+                                            value="<?= (int)$p['id'] ?>"
+                                        >
 
-                                        <button class="muted">Delete</button>
+                                        <button
+                                            type="submit"
+                                            class="muted"
+                                        >
+                                            Delete
+                                        </button>
                                     </form>
-                                </td>
-                            <?php endif; ?>
-                        </tr>
-                    <?php endforeach; ?>
-                </table>
-            </div>
+                                <?php endif; ?>
+                            </div>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+
+                <?php if (empty($patients)): ?>
+                    <tr>
+                        <td colspan="8">
+                            No patients registered yet.
+                        </td>
+                    </tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+
+<!-- PATIENT DETAILS / EDIT MODAL -->
+<div id="patientModal" class="patient-modal" hidden>
+    <div class="patient-modal-box">
+        <div class="patient-modal-header">
+            <h2 id="patientModalTitle">Patient Details</h2>
+
+            <button
+                type="button"
+                class="muted"
+                onclick="closePatientModal()"
+            >
+                ✕
+            </button>
         </div>
+
+        <form method="post" id="patientEditForm" class="form-grid">
+            <input
+                type="hidden"
+                name="csrf"
+                value="<?= esc(csrf()) ?>"
+            >
+            <input
+                type="hidden"
+                name="action"
+                value="edit_patient"
+            >
+            <input
+                type="hidden"
+                name="id"
+                id="editPatientId"
+            >
+
+            <label>
+                Full Name
+                <input id="editPatientName" name="name" required>
+            </label>
+
+            <label>
+                Contact Number
+                <input id="editPatientContact" name="contact">
+            </label>
+
+            <label>
+                Email
+                <input
+                    type="email"
+                    id="editPatientEmail"
+                    name="email"
+                >
+            </label>
+
+            <label>
+                Birthday
+                <input
+                    type="date"
+                    id="editPatientBirthday"
+                    name="birth_date"
+                >
+            </label>
+
+            <label>
+                Age
+                <input id="editPatientAge" readonly>
+            </label>
+
+            <label class="wide">
+                Address
+                <input id="editPatientAddress" name="address">
+            </label>
+
+            <label class="wide">
+                Notes
+                <textarea
+                    id="editPatientNotes"
+                    name="notes"
+                ></textarea>
+            </label>
+
+            <div class="wide patient-modal-actions">
+                <button
+                    type="button"
+                    class="muted"
+                    onclick="closePatientModal()"
+                >
+                    Close
+                </button>
+
+                <button type="submit" id="savePatientButton">
+                    Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+const patientData = <?= json_encode(
+    array_column($patients, null, 'id'),
+    JSON_HEX_TAG |
+    JSON_HEX_AMP |
+    JSON_HEX_APOS |
+    JSON_HEX_QUOT |
+    JSON_INVALID_UTF8_SUBSTITUTE
+) ?>;
+
+function calculatePatientAge(birthDate) {
+    if (!birthDate) return '';
+
+    const birthday = new Date(birthDate + 'T00:00:00');
+    const today = new Date();
+
+    let age = today.getFullYear() - birthday.getFullYear();
+
+    const monthDifference =
+        today.getMonth() - birthday.getMonth();
+
+    if (
+        monthDifference < 0 ||
+        (
+            monthDifference === 0 &&
+            today.getDate() < birthday.getDate()
+        )
+    ) {
+        age--;
+    }
+
+    return age >= 0 ? age : '';
+}
+
+function openPatientModal(id, mode) {
+    const patient = patientData[id];
+
+    if (!patient) return;
+
+    const modal = document.getElementById('patientModal');
+    const form = document.getElementById('patientEditForm');
+    const viewOnly = mode === 'view';
+
+    document.getElementById('patientModalTitle').textContent =
+        viewOnly ? 'Patient Information' : 'Edit Patient';
+
+    document.getElementById('editPatientId').value = patient.id;
+    document.getElementById('editPatientName').value =
+        patient.full_name || '';
+    document.getElementById('editPatientContact').value =
+        patient.contact || '';
+    document.getElementById('editPatientEmail').value =
+        patient.email || '';
+    document.getElementById('editPatientBirthday').value =
+        patient.birth_date || '';
+    document.getElementById('editPatientAge').value =
+        calculatePatientAge(patient.birth_date);
+    document.getElementById('editPatientAddress').value =
+        patient.address || '';
+    document.getElementById('editPatientNotes').value =
+        patient.notes || '';
+
+    form.querySelectorAll(
+        'input:not([type="hidden"]), textarea'
+    ).forEach(field => {
+        field.readOnly = viewOnly ||
+            field.id === 'editPatientAge';
+    });
+
+    document.getElementById('savePatientButton').hidden =
+        viewOnly;
+
+    modal.hidden = false;
+}
+
+function closePatientModal() {
+    document.getElementById('patientModal').hidden = true;
+}
+
+document.getElementById('editPatientBirthday')
+    .addEventListener('change', function () {
+        document.getElementById('editPatientAge').value =
+            calculatePatientAge(this.value);
+    });
+
+document.getElementById('patientModal')
+    .addEventListener('click', function (event) {
+        if (event.target === this) {
+            closePatientModal();
+        }
+    });
+
+document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') {
+        closePatientModal();
+    }
+});
+</script>
+
 
     <!-- APPOINTMENTS -->
     <?php elseif ($page === 'appointments'): ?>
@@ -653,14 +1042,45 @@ $completedCount = count(array_filter(
                     </select>
                 </label>
 
-                <label>
-                    Service
-                    <input
-                        name="service"
-                        placeholder="Dental cleaning"
-                        required
-                    >
-                </label>
+                
+<label>
+    Dental Service / Treatment
+
+    <select name="service" id="dentalService" required>
+        <option value="">Select dental service</option>
+        <option value="Dental Checkup / Consultation">
+            Dental Checkup / Consultation
+        </option>
+        <option value="Teeth Cleaning">
+            Teeth Cleaning (Oral Prophylaxis)
+        </option>
+        <option value="Tooth Extraction">
+            Tooth Extraction
+        </option>
+        <option value="Dental Filling">
+            Dental Filling (Pasta)
+        </option>
+        <option value="Braces / Orthodontics">
+            Braces / Orthodontics
+        </option>
+        <option value="Teeth Whitening">
+            Teeth Whitening
+        </option>
+        <option value="Root Canal Treatment">
+            Root Canal Treatment
+        </option>
+        <option value="Dentures">
+            Dentures
+        </option>
+        <option value="Dental Crown / Bridge">
+            Dental Crown / Bridge
+        </option>
+        <option value="Other Treatment">
+            Other Treatment
+        </option>
+    </select>
+</label>
+
 
                 <label>
                     Date
@@ -703,6 +1123,7 @@ $completedCount = count(array_filter(
                         <th>Service</th>
                         <th>Status</th>
                         <th>Update</th>
+                        <th>Arrival</th>
                     </tr>
 
                     <?php foreach ($appointments as $a): ?>
@@ -720,27 +1141,27 @@ $completedCount = count(array_filter(
                             <td><?= esc($a['service']) ?></td>
                             <td><?= esc($a['status']) ?></td>
 
-                            <td>
-                                <form method="post" class="inline">
-                                    <input type="hidden" name="csrf" value="<?= csrf() ?>">
-                                    <input type="hidden" name="action" value="status">
-                                    <input type="hidden" name="id" value="<?= (int)$a['id'] ?>">
+                            <!-- UPDATE STATUS -->
+<td>
+    <form method="post" class="inline">
+        <input type="hidden" name="csrf" value="<?= esc(csrf()) ?>">
+        <input type="hidden" name="action" value="status">
+        <input type="hidden" name="id" value="<?= (int)$a['id'] ?>">
 
-                                    <select name="status">
-                                        <?php foreach ($statuses as $s): ?>
-                                            <option
-                                                value="<?= esc($s) ?>"
-                                                <?= $a['status'] === $s ? 'selected' : '' ?>
-                                            >
-                                                <?= esc($s) ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
+        <select name="status">
+            <?php foreach ($statuses as $s): ?>
+                <option value="<?= esc($s) ?>"
+                    <?= $a['status'] === $s ? 'selected' : '' ?>>
+                    <?= esc($s) ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
 
-                                    <button type="submit">Save</button>
-                                </form>
-                            </td>
-                        </tr>
+        <button type="submit">Save</button>
+    </form>
+</td>
+
+                           
                     <?php endforeach; ?>
                 </table>
             </div>
@@ -773,19 +1194,22 @@ $completedCount = count(array_filter(
 
         <script>
             const events = <?= json_encode(
-                array_map(
-                    fn($a) => [
-                        'date' => $a['appointment_date'],
-                        'text' => $a['patient_name'] . ' — ' .
-                            substr($a['start_time'], 0, 5) . ' ' .
-                            $a['status']
-                    ],
-                    $appointments
-                ),
-                JSON_HEX_TAG | JSON_HEX_AMP |
-                JSON_HEX_APOS | JSON_HEX_QUOT
-            ) ?>;
-
+    array_map(
+        fn($a) => [
+            'date' => $a['appointment_date'],
+            'patient' => $a['patient_name'],
+            'service' => $a['service'],
+            'start' => substr($a['start_time'], 0, 5),
+            'end' => substr($a['end_time'], 0, 5),
+            'status' => $a['status'],
+            'notes' => $a['notes'] ?? ''
+        ],
+        $appointments
+    ),
+    JSON_HEX_TAG | JSON_HEX_AMP |
+    JSON_HEX_APOS | JSON_HEX_QUOT |
+    JSON_INVALID_UTF8_SUBSTITUTE
+) ?>;
             let month = new Date();
             let selected = [
                 month.getFullYear(),
@@ -853,23 +1277,109 @@ $completedCount = count(array_filter(
                         button.appendChild(small);
                     }
 
-                    button.addEventListener('click', () => chooseDay(day));
-                    calendar.appendChild(button);
-                }
+                    
 
-                document.getElementById('selectedLabel').textContent =
-                    'Appointments on ' + selected;
+button.addEventListener('click', () => {
+    chooseDay(day);
+    openCalendarAppointment(day);
+});
 
-                const items = events.filter(e => e.date === selected);
+calendar.appendChild(button);
+}
 
-                document.getElementById('dayEvents').textContent =
-                    items.length
-                        ? items.map(e => e.text).join(' | ')
-                        : 'No appointments for this date.';
-            }
+document.getElementById('selectedLabel').textContent =
+    'Appointments on ' + selected;
+
+const items = events.filter(e => e.date === selected);
+
+document.getElementById('dayEvents').textContent =
+    items.length
+        ? items.map(e =>
+            e.patient + ' — ' + e.start + ' (' + e.status + ')'
+          ).join(' | ')
+        : 'No appointments for this date.';
+}
+
+
+            
+function openCalendarAppointment(date) {
+    const appointments = events.filter(e => e.date === date);
+    const modal = document.getElementById('calendarAppointmentModal');
+    const title = document.getElementById('calendarModalTitle');
+    const content = document.getElementById('calendarModalContent');
+
+    title.textContent = 'Appointments on ' + date;
+    content.replaceChildren();
+
+    if (appointments.length === 0) {
+        const empty = document.createElement('p');
+        empty.textContent = 'No appointments for this date.';
+        content.appendChild(empty);
+    }
+
+    appointments.forEach(a => {
+        const card = document.createElement('div');
+        card.className = 'calendar-appointment-card';
+
+        const name = document.createElement('h3');
+        name.textContent = a.patient;
+
+        const service = document.createElement('p');
+        service.textContent = 'Service: ' + a.service;
+
+        const time = document.createElement('p');
+        time.textContent = 'Time: ' + a.start + ' - ' + a.end;
+
+        const status = document.createElement('p');
+        status.textContent = 'Status: ' + a.status;
+
+        const notes = document.createElement('p');
+        notes.textContent = 'Notes: ' + (a.notes || 'None');
+
+        card.append(name, service, time, status, notes);
+        content.appendChild(card);
+    });
+
+    modal.hidden = false;
+}
+
+function closeCalendarAppointment() {
+    document.getElementById('calendarAppointmentModal').hidden = true;
+}
 
             renderCal();
+
         </script>
+
+<!-- CALENDAR APPOINTMENT POPUP -->
+<div id="calendarAppointmentModal" class="calendar-modal" hidden>
+    <div class="calendar-modal-box"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="calendarModalTitle">
+
+        <div class="calendar-modal-header">
+            <h2 id="calendarModalTitle">Appointment Details</h2>
+
+            <button type="button"
+                    class="muted"
+                    onclick="closeCalendarAppointment()">
+                ✕
+            </button>
+        </div>
+
+        <div id="calendarModalContent"></div>
+
+        <div class="calendar-modal-footer">
+            <button type="button"
+                    class="muted"
+                    onclick="closeCalendarAppointment()">
+                Close
+            </button>
+        </div>
+    </div>
+</div>
+
 
     <!-- ATTENDANCE -->
     <?php elseif ($page === 'attendance'): ?>
@@ -1122,7 +1632,7 @@ $completedCount = count(array_filter(
         </div>
 
     <!-- ADMIN AND STAFF ACCOUNTS -->
-    <?php elseif ($page === 'accounts' && admin()): ?>
+    <?php elseif ($page === 'accounts' && can_create_accounts()): ?>
 
         <h2>Admin & Staff Registration</h2>
         <p>Only administrators can create accounts.</p>
