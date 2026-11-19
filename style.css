@@ -475,7 +475,7 @@ tr:hover td {
 }
 
 .hero {
-    background: linear-gradient(135deg, #165ed0, #49a3ff);
+    background: linear-gradient(135deg, #4c5215, #6f8a11);
     color: white;
     padding: 8vw 7vw;
 }
@@ -770,280 +770,7 @@ tr:hover td {
 }
 
 
-/* ART CARE - GOLDEN YELLOW THEME */
 
-/* Main system background */
-body,
-.main {
-    background-color: #E8BD55 !important;
-}
-
-/* Sidebar background */
-aside {
-    background-color: #FFFDF7 !important;
-}
-
-/* Active sidebar menu */
-nav a.active {
-    background-color: #E8BD55 !important;
-    color: #29251D !important;
-}
-
-/* Buttons */
-button:not(.muted),
-.button {
-    background-color: #E8BD55;
-    color: #29251D;
-}
-
-button:not(.muted):hover,
-.button:hover {
-    background-color: #D4A83E;
-}
-
-/* White content cards */
-.card,
-header {
-    background-color: #FFFFFF !important;
-    border-radius: 14px;
-}
-
-/* Calendar */
-.calendar .day.chosen {
-    background-color: #E8BD55 !important;
-    color: #29251D !important;
-}
-
-/* Brand */
-.brand {
-    color: #B8860B !important;
-}
-
-/* Form focus */
-input:focus,
-select:focus,
-textarea:focus {
-    border-color: #E8BD55 !important;
-}
-
-/* ART CARE - PASTEL YELLOW THEME */
-
-:root {
-    --primary: #F5D76E;
-    --primary-color: #F5D76E;
-    --accent: #F5D76E;
-    --blue: #F5D76E;
-}
-
-/* MAIN BACKGROUND */
-body, main, .main {
-    background: #F5D76E !important;
-}
-
-/* SIDEBAR */
-aside, .sidebar {
-    background: #FFFDF2 !important;
-}
-
-/* ACTIVE MENU */
-nav a.active,
-.sidebar .active {
-    background: #F5D76E !important;
-    color: #3D3525 !important;
-}
-
-/* BUTTONS */
-button:not(.muted),
-button[type="submit"],
-.button,
-.btn-primary {
-    background: #F5D76E !important;
-    color: #3D3525 !important;
-    border-color: #F5D76E !important;
-}
-
-/* BUTTON HOVER */
-button:not(.muted):hover,
-.button:hover,
-.btn-primary:hover {
-    background: #E8C65B !important;
-}
-
-/* CARDS */
-.card, header {
-    background: #FFFFFF !important;
-}
-
-/* INPUT FOCUS */
-input:focus,
-select:focus,
-textarea:focus {
-    border-color: #F5D76E !important;
-    outline-color: #F5D76E !important;
-}
-
-/* BRAND */
-.brand {
-    color: #9B7926 !important;
-}
-
-
-/* =====================================
-   ART CARE - ELEGANT YELLOW SIDEBAR
-===================================== */
-
-/* SIDEBAR BACKGROUND */
-aside,
-.sidebar {
-    background: #FFFDF5 !important;
-    border-right: 1px solid #F0E7D2 !important;
-}
-
-/* ART CARE LOGO */
-aside .brand,
-.sidebar .brand {
-    color: #9B7415 !important;
-    font-weight: 800;
-}
-
-/* LOGO SUBTITLE */
-aside .brand small {
-    color: #8C805F !important;
-}
-
-/* WORKSPACE LABEL */
-aside .navtitle {
-    color: #A99B7C !important;
-    letter-spacing: 2px;
-}
-
-/* SIDEBAR MENU LINKS */
-aside nav a {
-    color: #536B86 !important;
-    background: transparent;
-    border-radius: 9px;
-    transition: all 0.2s ease;
-}
-
-/* ACTIVE MENU */
-aside nav a.active {
-    background: #EBC157 !important;
-    color: #3D3525 !important;
-    font-weight: 700;
-    box-shadow: 0 3px 9px rgba(180, 140, 50, 0.15);
-}
-
-/* HOVER EFFECT */
-aside nav a:not(.active):hover {
-    background: #FFF0C4 !important;
-    color: #8C6718 !important;
-}
-
-/* ACCOUNT INFORMATION */
-aside .sidebar-bottom {
-    border-top: 1px solid #EFE5CE;
-    color: #3D3525 !important;
-}
-
-/* LOGOUT BUTTON */
-aside .logout-btn {
-    color: #A35A46 !important;
-}
-
-aside .logout-btn:hover {
-    background: #FFF0DC !important;
-}
-
-
-/* ART CARE - LIGHT PASTEL YELLOW SIDEBAR */
-
-/* Sidebar background */
-aside,
-.sidebar {
-    background: #FFFEF8 !important;
-    border-right: 1px solid #F5EEDB !important;
-}
-
-/* ART CARE logo */
-aside .brand {
-    color: #B99640 !important;
-}
-
-/* Workspace label */
-aside .navtitle {
-    color: #AFA58B !important;
-}
-
-/* Sidebar menu */
-aside nav a {
-    color: #6B6B6B !important;
-    background: transparent !important;
-    border-radius: 9px;
-}
-
-/* Active menu - light yellow */
-aside nav a.active {
-    background: #F9E9A7 !important;
-    color: #66501C !important;
-    font-weight: 600;
-    box-shadow: none !important;
-}
-
-/* Hover effect */
-aside nav a:not(.active):hover {
-    background: #FFF6D9 !important;
-    color: #8C722E !important;
-}
-
-/* Account section */
-aside .sidebar-bottom {
-    background: #FFFEF8 !important;
-    border-top: 1px solid #F5EEDB;
-}
-
-
-/* ART CARE - BRIGHT PASTEL YELLOW THEME */
-
-/* MAIN BACKGROUND */
-body:not(.auth),
-body:not(.auth) main,
-body:not(.auth) .main {
-    background: #FFEE8C !important;
-}
-
-/* SIDEBAR */
-aside,
-.sidebar {
-    background: #FFFEF8 !important;
-}
-
-/* ACTIVE SIDEBAR MENU */
-aside nav a.active {
-    background: #F9E9A7 !important;
-    color: #66501C !important;
-}
-
-/* WHITE CARDS */
-.card,
-main header {
-    background: #FFFFFF !important;
-}
-
-/* BUTTONS */
-button[type="submit"],
-.button,
-.btn-primary {
-    background: #F5D76E !important;
-    color: #3D3525 !important;
-    border-color: #F5D76E !important;
-}
-
-/* BUTTON HOVER */
-button[type="submit"]:hover,
-.button:hover,
-.btn-primary:hover {
-    background: #E8C65B !important;
-}
 
 
 /* FIX ART CARE SIDEBAR BRANDING */
@@ -1192,7 +919,7 @@ button[type="submit"]:hover,
 
 .notification-item button,
 .notification-header button {
-    background: #f5d76e;
+    background: #FFBB4E;
     color: #3b2b0e;
     border: none;
     border-radius: 8px;
@@ -1225,4 +952,433 @@ button[type="submit"]:hover,
     margin-top: 8px;
     margin-left: 5px;
     flex-shrink: 0;
+}
+
+
+/* =========================================
+   ART CARE - COMPLETE ELEGANT GOLD THEME
+   ALL PAGES INCLUDING LOGIN
+   ========================================= */
+
+:root {
+    --primary: #E8BD55;
+    --primary-dark: #C99B32;
+    --primary-light: #FFF0BD;
+    --primary-color: #E8BD55;
+    --accent: #E8BD55;
+
+    --background: #FFF9E8;
+    --surface: #FFFFFF;
+    --text: #2D2418;
+    --muted: #786B56;
+    --border: #EDE1C7;
+
+    --success: #18AD70;
+    --danger: #EF5261;
+
+    --shadow: 0 4px 20px rgba(80, 58, 20, 0.06);
+}
+
+/* MAIN SYSTEM BACKGROUND */
+
+html,
+body,
+body:not(.auth),
+.main,
+main.main {
+    background: #FFF9E8 !important;
+    color: var(--text);
+}
+
+/* SIDEBAR */
+
+aside,
+.sidebar {
+    background: #FFFCF5 !important;
+    border-right: 1px solid #EDE1C7 !important;
+}
+
+aside nav a {
+    color: #655844 !important;
+}
+
+aside nav a.active {
+    background: #F5E6B8 !important;
+    color: #2D2418 !important;
+    box-shadow: none !important;
+}
+
+aside nav a:not(.active):hover {
+    background: #FFF0BD !important;
+    color: #75531B !important;
+}
+
+/* CARDS AND HEADER */
+
+.card,
+.main header,
+.stat {
+    background: #FFFFFF !important;
+    border-color: #EDE1C7 !important;
+    box-shadow: var(--shadow);
+}
+
+/* BUTTONS */
+
+button:not(.muted),
+.button,
+.btn-primary {
+    background: #E8BD55 !important;
+    color: #2D2418 !important;
+    border-color: #E8BD55 !important;
+}
+
+button:not(.muted):hover,
+.button:hover,
+.btn-primary:hover {
+    background: #C99B32 !important;
+}
+
+/* FORMS */
+
+input:focus,
+select:focus,
+textarea:focus {
+    border-color: #E8BD55 !important;
+    box-shadow: 0 0 0 3px rgba(232,189,85,0.15);
+}
+
+/* TABLES */
+
+th {
+    background: #FFF6DC !important;
+    color: #786B56 !important;
+}
+
+tr:hover td {
+    background: #FFFAEE !important;
+}
+
+/* CALENDAR */
+
+.calendar .day {
+    background: #FFF0BD !important;
+    color: #2D2418 !important;
+    border-color: #F0DDA2 !important;
+}
+
+.calendar .day:hover {
+    background: #F5E6B8 !important;
+    color: #2D2418 !important;
+}
+
+.calendar .day.chosen {
+    background: #E8BD55 !important;
+    color: #2D2418 !important;
+    border-color: #C99B32 !important;
+}
+
+.calendar .day small {
+    color: #75531B;
+}
+
+/* KEEP RED NOTIFICATION DOTS */
+
+.notification-dot,
+.calendar-appointment-dot {
+    background-color: #DC2626 !important;
+}
+
+/* LOGIN PAGE */
+
+body.auth {
+    background: #FFF9E8 !important;
+}
+
+.auth .hero {
+    background: linear-gradient(
+        135deg,
+        #F5E6B8 0%,
+        #E8BD55 100%
+    ) !important;
+    color: #2D2418 !important;
+}
+
+.auth .hero h1 {
+    color: #2D2418 !important;
+}
+
+.auth .hero p,
+.auth .hero small {
+    color: #5D4724 !important;
+}
+
+.auth .auth-form {
+    background: #FFFCF5 !important;
+    color: #2D2418 !important;
+}
+
+.auth .auth-form h1 {
+    color: #2D2418 !important;
+}
+
+.auth .auth-form button {
+    background: #E8BD55 !important;
+    color: #2D2418 !important;
+}
+
+.auth .auth-form button:hover {
+    background: #C99B32 !important;
+}
+
+/* NOTIFICATIONS */
+
+.notification-item.unread {
+    background: #FFF0BD !important;
+    border-left-color: #E8BD55 !important;
+}
+
+.notification-item.read {
+    background: #FFFCF5 !important;
+}
+
+/* HEADINGS */
+
+h1, h2, h3 {
+    color: #2D2418;
+}
+
+
+/* ART CARE - SOFT MUTED GOLD THEME */
+
+:root {
+    --primary: #E8BD55;
+    --primary-dark: #D5A83F;
+    --primary-light: #F8E9B7;
+    --background: #F8F1DE;
+    --border: #E9DDBF;
+}
+
+/* All system pages */
+html,
+body,
+body:not(.auth),
+.main,
+main.main {
+    background: #F8F1DE !important;
+}
+
+/* Sidebar */
+aside,
+.sidebar {
+    background: #FFFCF5 !important;
+}
+
+/* Active sidebar menu */
+aside nav a.active {
+    background: #F3E3AD !important;
+    color: #4A391B !important;
+}
+
+/* Cards */
+.card,
+.main header {
+    background: #FFFFFF !important;
+}
+
+/* Buttons */
+button:not(.muted),
+.button,
+.btn-primary {
+    background: #E8BD55 !important;
+    color: #35280F !important;
+}
+
+button:not(.muted):hover,
+.button:hover {
+    background: #D5A83F !important;
+}
+
+/* Calendar - muted golden yellow */
+.calendar .day {
+    background: #F5E4B0 !important;
+    border: 1px solid #E9D49B !important;
+    color: #35280F !important;
+}
+
+.calendar .day:hover {
+    background: #EDD18A !important;
+}
+
+.calendar .day.chosen {
+    background: #E8BD55 !important;
+    border-color: #C99B32 !important;
+    color: #35280F !important;
+}
+
+/* Login page */
+.auth .hero {
+    background: linear-gradient(
+        135deg,
+        #F3E3AD,
+        #E8BD55
+    ) !important;
+}
+
+.auth .auth-form {
+    background: #FFFCF5 !important;
+}
+
+/* Keep appointment indicators red */
+.calendar-appointment-dot,
+.notification-dot {
+    background: #DC2626 !important;
+}
+
+
+/* ART CARE - MAIN BACKGROUND ONLY */
+
+body:not(.auth),
+body:not(.auth) .main,
+body:not(.auth) main.main {
+    background-color: #CF9100 !important;
+    background-image: none !important;
+}
+
+
+/* ART CARE - OFF-WHITE BOXES */
+
+/* Main cards and header boxes */
+.card,
+.main header,
+main.main header {
+    background-color: #FFF9ED !important;
+}
+
+/* Form fields */
+input,
+select,
+textarea {
+    background-color: #FFFCF5 !important;
+}
+
+/* Keep the main background golden */
+body:not(.auth),
+body:not(.auth) .main,
+body:not(.auth) main.main {
+    background-color: #CF9100 !important;
+}
+
+
+/* ===================================
+   ART CARE - LOGIN PAGE GOLD THEME
+=================================== */
+
+/* Left side - same as system background */
+body.auth .hero {
+    background: #CF9100 !important;
+    background-image: none !important;
+    color: #302719 !important;
+}
+
+/* Right side - off-white */
+body.auth .auth-form {
+    background: #FFF9ED !important;
+}
+
+/* Login page background */
+body.auth {
+    background: #CF9100 !important;
+}
+
+/* Login button */
+body.auth .auth-form button {
+    background: #CF9100 !important;
+    color: #FFFFFF !important;
+    border-color: #CF9100 !important;
+}
+
+body.auth .auth-form button:hover {
+    background: #AD7900 !important;
+}
+
+/* Text on left side */
+body.auth .hero h1,
+body.auth .hero p,
+body.auth .hero small,
+body.auth .hero .brand {
+    color: #302719 !important;
+}
+
+/* Login input fields */
+body.auth .auth-form input {
+    background: #FFFCF5 !important;
+}
+
+
+/* =====================================
+   ART CARE LOGIN PAGE - DASHBOARD THEME
+===================================== */
+
+/* Left side - same gold as Dashboard */
+body.auth .hero {
+    background: #CF9100 !important;
+    background-color: #CF9100 !important;
+    background-image: none !important;
+}
+
+/* Right side - same off-white as Dashboard cards */
+body.auth .auth-form {
+    background: #FFF9ED !important;
+    background-color: #FFF9ED !important;
+}
+
+/* Login page base background */
+body.auth {
+    background: #CF9100 !important;
+}
+
+/* Login button */
+body.auth .auth-form button {
+    background: #CF9100 !important;
+    color: #FFFFFF !important;
+    border-color: #CF9100 !important;
+}
+
+/* Login button hover */
+body.auth .auth-form button:hover {
+    background: #AD7900 !important;
+}
+
+/* Left side text */
+body.auth .hero h1,
+body.auth .hero p,
+body.auth .hero small,
+body.auth .hero .brand {
+    color: #302719 !important;
+}
+
+
+/* FORCE LOGIN PAGE TO MATCH DASHBOARD */
+
+/* Left side - dashboard gold */
+html body.auth > .hero,
+html body.auth .hero {
+    background: #CF9100 !important;
+    background-color: #CF9100 !important;
+    background-image: none !important;
+}
+
+/* Right side - dashboard off-white */
+html body.auth > .auth-form,
+html body.auth .auth-form {
+    background: #FFF9ED !important;
+    background-color: #FFF9ED !important;
+}
+
+/* Login button */
+html body.auth .auth-form button {
+    background: #CF9100 !important;
+    border-color: #CF9100 !important;
+    color: #FFFFFF !important;
 }

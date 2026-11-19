@@ -3,6 +3,24 @@
 require 'config.php';
 require_login();
 
+define('ARTCARE_PAYMENT_MODULE', true);
+
+require_once __DIR__ . '/artcare_payment_module.php';
+require_once __DIR__ . '/artcare_remaining_payments.php';
+
+ar_handle_receipt();
+ar_handle_post();
+if ($_SERVER['REQUEST_METHOD'] === 'POST' &&
+    in_array($_POST['action'] ?? '', [
+    'service_save',
+    'service_toggle',
+    'deposit_submit',
+    'deposit_verify',
+    'remaining_payment_submit',
+    'remaining_payment_verify'
+], true)) {
+    payment_handle_post();
+}
 
 $page = $_GET['page'] ?? 'dashboard';
 // COUNT UNREAD NOTIFICATIONS
@@ -32,12 +50,19 @@ $labels = [
     'notifications' => 'Notifications',
     'reports' => 'Reports',
     'settings' => 'Clinic Settings',
-    'accounts' => 'Receptionist Account'
+    'accounts' => 'Receptionist Account',
+    'service_management' => 'Dental Service Management',
+    'payment_management' => 'Payment Management',
 ];
 
 
 
 if (!isset($labels[$page])) {
+    $page = 'dashboard';
+}
+
+// ADMIN ONLY - DENTAL SERVICE MANAGEMENT
+if ($page === 'service_management' && !admin()) {
     $page = 'dashboard';
 }
 
@@ -338,6 +363,69 @@ if ($action === 'read_all_notifications') {
         }
 
 
+if ($action === 'account') {
+    if (!admin()) {
+        throw new Exception('Administrator access required.');
+    }
+
+    $name = trim($_POST['full_name'] ?? '');
+    $username = trim($_POST['username'] ?? '');
+    $password = $_POST['password'] ?? '';
+    $role = $_POST['role'] ?? 'staff';
+
+    if (
+        $name === '' ||
+        $username === '' ||
+        strlen($password) < 8 ||
+        !in_array($role, ['admin', 'staff'], true)
+    ) {
+        throw new Exception(
+            'Invalid account details. Password must have at least 8 characters.'
+        );
+    }
+
+    $existing = one(
+        "SELECT id FROM users WHERE username = ? LIMIT 1",
+        's',
+        [$username]
+    );
+
+    if ($existing) {
+        throw new Exception('Username already exists.');
+    }
+
+    stmt(
+        "INSERT INTO users
+         (full_name, username, password_hash, role)
+         VALUES (?, ?, ?, ?)",
+        'ssss',
+        [
+            $name,
+            $username,
+            password_hash($password, PASSWORD_DEFAULT),
+            $role
+        ]
+    );
+
+    notice('Account created successfully.');
+    go('?page=accounts');
+}
+
+
+if ($action === 'update_appointment_action') {
+    $selected = $_POST['appointment_action'] ?? '';
+
+    if ($selected === 'check_in') {
+        $_POST['action'] = 'mark_arrived';
+        $action = 'mark_arrived';
+    } else {
+        $_POST['status'] = $selected;
+        $_POST['action'] = 'status';
+        $action = 'status';
+    }
+}
+
+
         // CONFIRM PATIENT ARRIVAL
         if ($action === 'mark_arrived') {
 
@@ -466,7 +554,10 @@ if ($action === 'status') {
     $_SESSION['form_error'] = $message;
 
     $target = $_POST['action'] ?? '';
-
+    
+    if ($target === 'account') {
+    go('?page=accounts');
+}
     if ($target === 'add_appointment' || $target === 'status' || $target === 'mark_arrived') {
         go('?page=appointments');
     }
@@ -590,12 +681,14 @@ $completedCount = count(array_filter(
         <?php foreach ($labels as $key => $label): ?>
 
             <?php
-            
-    if ($key === 'accounts' && !can_create_accounts()) {
+if ($key === 'accounts' && !can_create_accounts()) {
     continue;
 }
 
-            ?>
+if ($key === 'service_management' && !admin()) {
+    continue;
+}
+?>
 
            <a
     href="?page=<?= esc($key) ?>"
@@ -666,7 +759,15 @@ $completedCount = count(array_filter(
 <?php endif; ?>
 
     <!-- DASHBOARD -->
-    <?php if ($page === 'dashboard'): ?>
+    <?php if ($page === 'service_management'): ?>
+
+    <?php payment_render_services(); ?>
+
+<?php elseif ($page === 'payment_management'): ?>
+
+<?php ar_render_payment_management(); ?>
+
+<?php elseif ($page === 'dashboard'): ?>
 
         <div class="section-head">
             <div>
@@ -1202,16 +1303,33 @@ document.addEventListener('keydown', function (event) {
                             </td>
 
                             <td><?= esc($a['service']) ?></td>
-                            <td><?= esc($a['status']) ?></td>
+                            <td>
+    <?php if (
+        !empty($a['arrived_at']) &&
+        in_array($a['status'], ['Pending', 'Confirmed', 'Rescheduled'], true)
+    ): ?>
+        <strong style="color:#16803c;">Checked In</strong>
+    <?php else: ?>
+        <?= esc($a['status']) ?>
+    <?php endif; ?>
+</td>
 
                             <!-- UPDATE STATUS -->
+
+
 <td>
     <form method="post" class="inline">
         <input type="hidden" name="csrf" value="<?= esc(csrf()) ?>">
-        <input type="hidden" name="action" value="status">
         <input type="hidden" name="id" value="<?= (int)$a['id'] ?>">
 
-        <select name="status">
+        <select name="appointment_action" required>
+            <?php if (
+                in_array($a['status'], ['Pending', 'Confirmed', 'Rescheduled'], true)
+                && empty($a['arrived_at'])
+            ): ?>
+                <option value="check_in">Check In</option>
+            <?php endif; ?>
+
             <?php foreach ($statuses as $s): ?>
                 <option value="<?= esc($s) ?>"
                     <?= $a['status'] === $s ? 'selected' : '' ?>>
@@ -1220,11 +1338,11 @@ document.addEventListener('keydown', function (event) {
             <?php endforeach; ?>
         </select>
 
-        <button type="submit">Save</button>
+        <button type="submit" name="action" value="update_appointment_action">
+            Save
+        </button>
     </form>
-</td>
-
-                           
+</td>               
                     <?php endforeach; ?>
                 </table>
             </div>
@@ -1766,7 +1884,7 @@ $unreadCount = (int)($unread['total'] ?? 0);
 
                 <label>
                     Full name
-                    <input name="name" required>
+                    <input type="text" name="full_name" required>
                 </label>
 
                 <label>

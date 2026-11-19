@@ -65,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 
     <link rel="icon" type="image/png" href="artcare-logo.png">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=20261119-2">
 
     <style>
         /* ART CARE - PASTEL YELLOW LOGIN THEME */
